@@ -4,9 +4,9 @@
 ## ============================================================
 ##
 ## Supplementary code for:
-## "Dynamic Energy Budget Theory, Bayesian Inference, and
-##  Machine Learning: A Comparative Review with a Decision
-##  Framework for Ecological Modelling"
+## "Dynamic Energy Budget Theory Meets Bayesian Inference and
+##  Machine Learning: A Critical Comparison with Practical
+##  Guidelines for Ecological Modellers"
 ##
 ## Authors: B.K. Hackenberger & T. Djerdj
 ## Journal: Ecological Modelling
@@ -891,9 +891,17 @@ cat("============================================================\n\n")
 set.seed(42)
 
 # True model: kappa decreases with age (simulating ontogenetic shift)
+# ---------------------------------------------------------------
+# NOTE: kappa (the fraction of mobilised energy allocated to soma)
+# decreases LINEARLY from 0.85 at day 0 to 0.55 at day 21.
+# This represents an ontogenetic shift in energy allocation, where
+# maturing individuals divert progressively more energy towards
+# reproduction.  The standard constant-kappa DEB model CANNOT
+# capture this trajectory, making it structurally misspecified.
+# ---------------------------------------------------------------
 deb_growth_variable_kappa <- function(t, params, temp_C = 20) {
   TC <- exp(params$TA / params$Tref - params$TA / (temp_C + 273.15))
-  # kappa decreases from 0.85 to 0.55 over 21 days
+  # kappa decreases linearly: 0.85 (day 0) -> 0.55 (day 21)
   kappa_t <- 0.85 - 0.30 * (t / 21)
   # This modulates Linf dynamically
   Linf_t <- kappa_t * params$Linf_max
@@ -1150,6 +1158,233 @@ cat("\nKey insight: When the mechanistic model is misspecified (constant-kappa\n
 cat("DEB fitted to variable-kappa data), ML methods can outperform DEB\n")
 cat("because they are not constrained by incorrect structural assumptions.\n")
 
+## ------------------------------------------------------------
+## 10b. PRIOR SENSITIVITY ANALYSIS (Scenario 3 extension)
+## ------------------------------------------------------------
+## Do WEAK priors (3x inflated variance) help or hurt when the
+## mechanistic model is misspecified?  Intuitively, informative
+## priors anchor the posterior near published parameter values,
+## which may be *further* from the best compromise parameters
+## under misspecification.  Weak priors let the data speak more
+## freely, potentially yielding a better fit to the (non-DEB)
+## generating process.
+
+cat("\n--- PRIOR SENSITIVITY: informative vs weak priors under misspecification ---\n")
+cat("  (Weak priors = prior variances inflated by factor 3)\n\n")
+
+set.seed(42)
+
+# Log-prior with WEAK priors: inflate log-scale SDs by sqrt(3)
+# so that the prior VARIANCE is 3x the informative prior variance.
+# Original SDs: log(Linf) ~ 0.2, log(rB) ~ 0.3, log(L0) ~ 0.2
+# Weak SDs:     log(Linf) ~ 0.2*sqrt(3), log(rB) ~ 0.3*sqrt(3), log(L0) ~ 0.2*sqrt(3)
+log_prior_weak <- function(par) {
+  Linf  <- par[1]
+  rB    <- par[2]
+  L0    <- par[3]
+  sigma <- par[4]
+
+  sd_mult <- sqrt(3)  # inflate SD so variance is 3x
+  lp <- dnorm(log(Linf), log(4.8), 0.2 * sd_mult, log = TRUE) +
+        dnorm(log(rB), log(0.15), 0.3 * sd_mult, log = TRUE) +
+        dnorm(log(L0), log(0.8), 0.2 * sd_mult, log = TRUE) +
+        dunif(sigma, 0.01, 1.0, log = TRUE)
+  return(lp)
+}
+
+bayesian_setup_misspec_weak <- createBayesianSetup(
+  likelihood = log_likelihood_misspec,
+  prior = createPrior(
+    density = log_prior_weak,
+    sampler = function() c(
+      exp(rnorm(1, log(4.8), 0.2 * sqrt(3))),
+      exp(rnorm(1, log(0.15), 0.3 * sqrt(3))),
+      exp(rnorm(1, log(0.8), 0.2 * sqrt(3))),
+      runif(1, 0.05, 0.5)
+    ),
+    lower = c(1, 0.01, 0.1, 0.01),
+    upper = c(10, 1.0, 3.0, 1.0)
+  ),
+  names = c("Linf", "rB", "L0", "sigma")
+)
+
+cat("  Running MCMC with WEAK priors (DEzs, 3 chains x 10000 iterations)...\n")
+
+t_bayes_weak_start <- Sys.time()
+fit_bayesian_misspec_weak <- runMCMC(
+  bayesianSetup = bayesian_setup_misspec_weak,
+  sampler = "DEzs",
+  settings = list(
+    iterations = 10000,
+    burnin = 3000,
+    thin = 2,
+    nrChains = 3,
+    message = FALSE
+  )
+)
+t_bayes_weak_end <- Sys.time()
+t_bayes_weak <- as.numeric(difftime(t_bayes_weak_end, t_bayes_weak_start, units = "secs"))
+
+posterior_s3_weak <- getSample(fit_bayesian_misspec_weak, parametersOnly = TRUE)
+post_summary_s3_weak <- apply(posterior_s3_weak, 2, function(x)
+  c(mean = mean(x), sd = sd(x),
+    q025 = quantile(x, 0.025), q975 = quantile(x, 0.975)))
+
+cat("  Posterior summary (weak priors):\n")
+print(round(post_summary_s3_weak, 4))
+cat("  Runtime:", round(t_bayes_weak, 1), "s\n\n")
+
+params_bayesian_s3_weak <- list(
+  Linf = post_summary_s3_weak["mean", "Linf"],
+  rB   = post_summary_s3_weak["mean", "rB"],
+  L0   = post_summary_s3_weak["mean", "L0"],
+  TA   = true_params_misspec$TA,
+  Tref = true_params_misspec$Tref
+)
+
+train_misspec$pred_bayesian_weak <- deb_growth(
+  train_misspec$time, params_bayesian_s3_weak, 20)
+
+# Compare RMSE: informative vs weak priors under misspecification
+rmse_bayes_inform <- results_misspec$RMSE[results_misspec$Paradigm == "Bayesian DEB"]
+rmse_bayes_weak   <- sqrt(mean((train_misspec$L_obs - train_misspec$pred_bayesian_weak)^2))
+
+cat("  Bayesian DEB RMSE (informative priors):", round(rmse_bayes_inform, 4), "mm\n")
+cat("  Bayesian DEB RMSE (weak priors):       ", round(rmse_bayes_weak, 4), "mm\n")
+
+if (rmse_bayes_weak < rmse_bayes_inform) {
+  cat("  -> Weak priors HELP under misspecification (RMSE reduced by ",
+      round((rmse_bayes_inform - rmse_bayes_weak) / rmse_bayes_inform * 100, 1),
+      "%)\n", sep = "")
+  cat("     Interpretation: informative priors anchor parameters near published\n")
+  cat("     values that are optimal for the *correctly specified* model, pulling\n")
+  cat("     the posterior away from the best-compromise parameters for the\n")
+  cat("     misspecified data.\n")
+} else {
+  cat("  -> Weak priors do NOT help under misspecification (RMSE increased by ",
+      round((rmse_bayes_weak - rmse_bayes_inform) / rmse_bayes_inform * 100, 1),
+      "%)\n", sep = "")
+  cat("     Interpretation: the structural misspecification (constant vs variable\n")
+  cat("     kappa) dominates -- relaxing priors cannot compensate for the wrong\n")
+  cat("     functional form.\n")
+}
+
+## ------------------------------------------------------------
+## 10c. DIAGNOSTIC PLOTS FOR SCENARIO 3
+## ------------------------------------------------------------
+## Generate benchmark_figure_misspec.pdf/png with:
+##   Panel A -- Model predictions overlaid on misspecified data
+##   Panel B -- Residuals for each approach
+
+cat("\n--- GENERATING DIAGNOSTIC PLOTS FOR SCENARIO 3 ---\n")
+
+# Fine-grid predictions for smooth curves
+time_fine_s3 <- seq(0, 21, by = 0.1)
+
+# True variable-kappa curve (the actual data-generating process)
+# Reminder: kappa decreases linearly from 0.85 (day 0) to 0.55 (day 21)
+true_curve_s3 <- data.frame(
+  time = time_fine_s3,
+  L    = deb_growth_variable_kappa(time_fine_s3, true_params_misspec, 20)
+)
+
+# Classical DEB prediction (constant-kappa, misspecified)
+curve_classical_s3 <- data.frame(
+  time = time_fine_s3,
+  pred = deb_growth(time_fine_s3, params_classical_s3, 20),
+  method = "Classical DEB"
+)
+
+# Bayesian DEB prediction (informative priors, constant-kappa, misspecified)
+curve_bayesian_s3 <- data.frame(
+  time = time_fine_s3,
+  pred = deb_growth(time_fine_s3, params_bayesian_s3, 20),
+  method = "Bayesian DEB"
+)
+
+# Random Forest prediction on fine grid
+rf_fine_s3 <- data.frame(time = time_fine_s3, temp = 20)
+rf_fine_s3$pred <- predict(rf_model_misspec, rf_fine_s3)
+
+# XGBoost prediction on fine grid
+xgb_fine_s3 <- xgb.DMatrix(
+  data = as.matrix(data.frame(time = time_fine_s3, temp = 20)))
+xgb_fine_s3_pred <- predict(xgb_model_misspec, xgb_fine_s3)
+
+# --- Panel A: Predictions overlaid on misspecified data ---
+p_misspec_a <- ggplot() +
+  geom_line(data = true_curve_s3, aes(x = time, y = L),
+            colour = "grey50", linetype = "dashed", linewidth = 0.7) +
+  geom_line(data = curve_classical_s3, aes(x = time, y = pred),
+            colour = "steelblue", linewidth = 0.8) +
+  geom_line(data = curve_bayesian_s3, aes(x = time, y = pred),
+            colour = "darkorange", linewidth = 0.8) +
+  geom_line(data = data.frame(time = time_fine_s3, pred = rf_fine_s3$pred),
+            aes(x = time, y = pred),
+            colour = "forestgreen", linewidth = 0.8) +
+  geom_line(data = data.frame(time = time_fine_s3, pred = xgb_fine_s3_pred),
+            aes(x = time, y = pred),
+            colour = "purple", linewidth = 0.8) +
+  geom_point(data = train_misspec, aes(x = time, y = L_obs),
+             size = 1, alpha = 0.4) +
+  labs(x = "Time (days)", y = "Body length (mm)",
+       title = "A) Misspecified data: model predictions") +
+  annotate("text", x = 1, y = max(train_misspec$L_obs) * 0.98,
+           label = "Dashed grey: true variable-kappa model", size = 2.5, hjust = 0) +
+  theme_bw(base_size = 10) +
+  theme(plot.title = element_text(face = "bold", size = 10))
+
+# --- Panel B: Residuals ---
+# Compute residuals at observed time points for each approach
+resid_df <- data.frame(
+  time = rep(train_misspec$time, 4),
+  residual = c(
+    train_misspec$L_obs - train_misspec$pred_classical,
+    train_misspec$L_obs - train_misspec$pred_bayesian,
+    train_misspec$L_obs - train_misspec$pred_rf,
+    train_misspec$L_obs - train_misspec$pred_xgb
+  ),
+  Method = rep(c("Classical DEB", "Bayesian DEB", "Random Forest", "XGBoost"),
+               each = nrow(train_misspec))
+)
+
+# Set factor levels for consistent colour mapping
+resid_df$Method <- factor(resid_df$Method,
+  levels = c("Classical DEB", "Bayesian DEB", "Random Forest", "XGBoost"))
+
+method_colours <- c("Classical DEB" = "steelblue",
+                     "Bayesian DEB"  = "darkorange",
+                     "Random Forest" = "forestgreen",
+                     "XGBoost"       = "purple")
+
+p_misspec_b <- ggplot(resid_df, aes(x = time, y = residual, colour = Method)) +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
+  geom_point(size = 1, alpha = 0.5, position = position_jitter(width = 0.2)) +
+  geom_smooth(method = "loess", se = FALSE, linewidth = 0.7, span = 0.75) +
+  scale_colour_manual(values = method_colours) +
+  labs(x = "Time (days)", y = "Residual (mm)",
+       title = "B) Residuals under misspecification",
+       colour = "") +
+  theme_bw(base_size = 10) +
+  theme(plot.title = element_text(face = "bold", size = 10),
+        legend.position = "bottom")
+
+# Combine panels using patchwork
+fig_misspec <- p_misspec_a / p_misspec_b +
+  plot_annotation(
+    caption = paste0(
+      "Blue: Classical DEB (constant kappa). Orange: Bayesian DEB (informative priors). ",
+      "Green: Random Forest. Purple: XGBoost.\n",
+      "Dashed grey: true generating model (kappa decreases linearly from 0.85 to 0.55 over 21 days)."
+    ),
+    theme = theme(plot.caption = element_text(size = 8, hjust = 0))
+  )
+
+ggsave("benchmark_figure_misspec.pdf", fig_misspec, width = 8, height = 7, dpi = 300)
+ggsave("benchmark_figure_misspec.png", fig_misspec, width = 8, height = 7, dpi = 300)
+
+cat("Figure saved to benchmark_figure_misspec.pdf and benchmark_figure_misspec.png\n")
+
 cat("\n============================================================\n")
 cat("BENCHMARK COMPLETE\n")
 cat("Files generated:\n")
@@ -1158,4 +1393,6 @@ cat("  benchmark_results_multitemp.csv - Scenario 2 results table\n")
 cat("  benchmark_results_misspec.csv   - Scenario 3 results table\n")
 cat("  benchmark_figure.pdf            - four-approach comparison figure\n")
 cat("  benchmark_figure.png            - same, PNG format\n")
+cat("  benchmark_figure_misspec.pdf    - Scenario 3 diagnostic figure\n")
+cat("  benchmark_figure_misspec.png    - same, PNG format\n")
 cat("============================================================\n")
