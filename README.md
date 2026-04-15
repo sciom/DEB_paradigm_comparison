@@ -71,7 +71,7 @@ Running time: approximately 3-5 minutes on a standard desktop computer. All resu
 If you use this code, please cite:
 
 ```
-Hackenberger, B.K., Djerdj, T. (2025). Mechanistic, Bayesian, and Machine Learning
+Hackenberger, B.K., Djerdj, T. (2026). Mechanistic, Bayesian, and Machine Learning
 Approaches to Metabolic Modelling: A Critical Review of Dynamic Energy Budget Theory
 and Its Alternatives. Ecological Modelling (submitted).
 ```
