@@ -2,7 +2,7 @@
 
 Reproducible benchmark code and results for:
 
-> **Dynamic Energy Budget Theory Meets Bayesian Inference and Machine Learning: A Critical Comparison with Practical Guidelines for Ecological Modellers**
+> **Dynamic Energy Budget Theory, Bayesian Inference, and Machine Learning: A Comparative Review with a Decision Framework for Ecological Modelling**
 >
 > Branimir K. Hackenberger & Tamara Djerdj
 >
@@ -71,9 +71,9 @@ Running time: approximately 3-5 minutes on a standard desktop computer. All resu
 If you use this code, please cite:
 
 ```
-Hackenberger, B.K., Djerdj, T. (2026). Dynamic Energy Budget Theory Meets Bayesian
-Inference and Machine Learning: A Critical Comparison with Practical Guidelines for
-Ecological Modellers. Ecological Modelling (submitted).
+Hackenberger, B.K., Djerdj, T. (2026). Dynamic Energy Budget Theory, Bayesian
+Inference, and Machine Learning: A Comparative Review with a Decision Framework
+for Ecological Modelling. Ecological Modelling (submitted).
 ```
 
 ## Licence

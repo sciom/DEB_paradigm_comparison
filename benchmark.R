@@ -4,9 +4,9 @@
 ## ============================================================
 ##
 ## Supplementary code for:
-## "Dynamic Energy Budget Theory Meets Bayesian Inference and
-##  Machine Learning: A Critical Comparison with Practical
-##  Guidelines for Ecological Modellers"
+## "Dynamic Energy Budget Theory, Bayesian Inference, and
+##  Machine Learning: A Comparative Review with a Decision
+##  Framework for Ecological Modelling"
 ##
 ## Authors: B.K. Hackenberger & T. Djerdj
 ## Journal: Ecological Modelling
