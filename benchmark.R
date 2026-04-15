@@ -4,9 +4,9 @@
 ## ============================================================
 ##
 ## Supplementary code for:
-## "Mechanistic, Bayesian, and Machine Learning Approaches to
-##  Metabolic Modelling: A Critical Review of Dynamic Energy
-##  Budget Theory and Its Alternatives"
+## "Dynamic Energy Budget Theory Meets Bayesian Inference and
+##  Machine Learning: A Critical Comparison with Practical
+##  Guidelines for Ecological Modellers"
 ##
 ## Authors: B.K. Hackenberger & T. Djerdj
 ## Journal: Ecological Modelling

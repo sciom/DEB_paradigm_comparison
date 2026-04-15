@@ -2,7 +2,7 @@
 
 Reproducible benchmark code and results for:
 
-> **Mechanistic, Bayesian, and Machine Learning Approaches to Metabolic Modelling: A Critical Review of Dynamic Energy Budget Theory and Its Alternatives**
+> **Dynamic Energy Budget Theory Meets Bayesian Inference and Machine Learning: A Critical Comparison with Practical Guidelines for Ecological Modellers**
 >
 > Branimir K. Hackenberger & Tamara Djerdj
 >
@@ -71,9 +71,9 @@ Running time: approximately 3-5 minutes on a standard desktop computer. All resu
 If you use this code, please cite:
 
 ```
-Hackenberger, B.K., Djerdj, T. (2026). Mechanistic, Bayesian, and Machine Learning
-Approaches to Metabolic Modelling: A Critical Review of Dynamic Energy Budget Theory
-and Its Alternatives. Ecological Modelling (submitted).
+Hackenberger, B.K., Djerdj, T. (2026). Dynamic Energy Budget Theory Meets Bayesian
+Inference and Machine Learning: A Critical Comparison with Practical Guidelines for
+Ecological Modellers. Ecological Modelling (submitted).
 ```
 
 ## Licence
